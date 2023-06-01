@@ -1,6 +1,14 @@
 <template>
   <q-page class="my-font">
     <!-- Фильтры слева -->
+    <q-btn
+      class="menu-btn"
+      @click="toggleLeftDrawer"
+      flat
+      round
+      dense
+      icon="menu"
+    />
     <q-drawer
       v-model="leftDrawerOpen"
       show-if-above
@@ -11,33 +19,14 @@
       <q-scroll-area class="fit">
         <div class="q-pa-lg">
           <div class="q-py-sm">Цвет</div>
+
           <q-option-group
             v-model="group"
             :options="options"
+            :select="filterColor(group)"
             color="grey"
             type="checkbox"
           />
-          <!-- <div class="q-py-sm">Цвет</div>
-          <q-option-group
-            v-model="group"
-            :options="options"
-            color="grey"
-            type="checkbox"
-          />
-          <div class="q-py-sm">Тип</div>
-          <q-option-group
-            v-model="group"
-            :options="options"
-            color="grey"
-            type="checkbox"
-          />
-          <div class="q-py-sm">Материал</div>
-          <q-option-group
-            v-model="group"
-            :options="options"
-            color="grey"
-            type="checkbox"
-          /> -->
         </div>
       </q-scroll-area>
     </q-drawer>
@@ -47,10 +36,9 @@
       <div class="input_main">
         <div>
           <q-input
-            @keyup.enter="addTask"
             rounded
             outlined
-            v-model="addToNote"
+            v-model="searchToy"
             placeholder="Поиск"
             class="q-mt-md"
           >
@@ -65,8 +53,9 @@
           class="select_main"
           rounded
           outlined
-          v-model="model"
-          :options="options"
+          v-model="sortToys"
+          :options="sortOptions"
+          :select="sortedCard(sortToys)"
           label="Сортировать по"
         />
       </div>
@@ -74,16 +63,36 @@
 
     <!-- Каталог -->
     <div class="q-pa-md row justify-around">
-      <q-card v-for="toy in toys" :key="toy.id" class="my-card q-pa-md q-ma-sm">
+      <q-card
+        v-for="toy in search"
+        :key="toy.id"
+        class="my-card q-pa-md q-ma-sm"
+      >
         <q-img :src="toy.image1" alt="logo" />
+
         <q-card-section class="q-pa-none">
-          <div class="text-subtitle1 q-pt-lg">{{ toy.name }}</div>
+          <div class="text-subtitle1 text-center q-pt-lg">{{ toy.name }}</div>
+
           <div class="flex items-center justify-between q-pt-lg">
-            <div class="text-h6">{{ toy.price }} ₽</div>
-            <q-btn @click="addToBasket(toy)" flat icon="shopping_cart"></q-btn>
+            <div class="text-h6 q-mb-sm">{{ toy.price }} ₽</div>
+
+            <div class="q-mb-sm" v-if="isVisible">
+              <q-btn @click="clickBasket(toy)" flat icon="shopping_cart">
+              </q-btn>
+            </div>
+
+            <div v-else style="margin: auto">
+              <q-btn
+                to="/basket"
+                class="border-btn"
+                style="width: 100%"
+                label="Перейти в корзину"
+              />
+            </div>
           </div>
+
           <q-btn
-            class="q-mt-md"
+            class="q-mt-sm"
             style="width: 100%"
             label="Подробнее"
             color="primary"
@@ -99,7 +108,7 @@
           <div class="text-h6" style="max-width: 600px">
             {{ dialogDesk.name }}
           </div>
-          <q-btn flat icon="shopping_cart"></q-btn>
+          <q-btn @click="clickBasket(dialogDesk)" flat icon="shopping_cart"></q-btn>
         </q-card-section>
 
         <q-separator />
@@ -178,32 +187,27 @@
 
 <script>
 import { computed, ref } from "vue";
-import { useQuery } from "@vue/apollo-composable";
-import gql from "graphql-tag";
+import { useToysStore } from "../stores/homeToys";
 
 export default {
   setup() {
-    const { result, loading, error } = useQuery(gql`
-      query MyQuery {
-        toys {
-          color
-          description
-          height
-          material
-          name
-          price
-          type
-          image1
-          image2
-          image3
-        }
-      }
-    `);
-
-    const toys = computed(() => result.value?.toys ?? []);
-
+    /**
+     * qusar капот
+     */
+    const slide = ref(1);
+    const autoplay = ref(true);
     const fixed = ref(false);
+    /**
+     * хранилище
+     */
+    const storeHomeToys = useToysStore();
+    const toys = storeHomeToys.setToys;
+    storeHomeToys.getToys();
+    const clonToys = computed(() => [...toys.value]);
 
+    /**
+     * отображение индивидуальной карточки
+     */
     let dialogDesk = ref("");
 
     const clickInfo = (toy) => {
@@ -211,47 +215,159 @@ export default {
       dialogDesk.value = toy;
     };
 
+    /**
+     * поиск
+     */
+    const searchToy = ref("");
+
+    const search = computed(() => {
+      return filterArrayColor.value.filter((card) => {
+        return card.name.toLowerCase().includes(searchToy.value.toLowerCase());
+      });
+    });
+
+    /**
+     * сортировка
+     */
+
+    const sortToys = ref("");
+
+    const sortedCard = () => {
+      switch (sortToys.value.value) {
+        case "Дёшево - сердито":
+          return search.value.sort(sortByAsk);
+        case "Дорого - богато":
+          return search.value.sort(sortByDesk);
+        default: // break 
+          return search.value;
+      }
+    };
+
+    const sortByAsk = (a, b) => {
+      return a.price > b.price ? 1 : -1;
+    };
+
+    const sortByDesk = (a, b) => {
+      return a.price < b.price ? 1 : -1;
+    };
+
+    const sortOptions = [
+      { label: "Дёшево - сердито", value: "Дёшево - сердито" },
+      { label: "Дорого - богато", value: "Дорого - богато" },
+    ];
+
+    /**
+     * фильтрация
+     */
+    const group = ref([]);
+    const filterByColor = ref([]);
+
+    const filterColor = (group) => {
+      filterByColor.value.length = 0;
+      for (let i of group) {
+        toys.value.map((elem) => {
+          if (elem.color === i) {
+            filterByColor.value.push(elem);
+          } else {
+            return;
+          }
+        });
+      }
+    };
+
+    const filterArrayColor = computed(() => {
+      if (filterByColor.value.length) {
+        return filterByColor.value;
+      } else {
+        return clonToys.value;
+      }
+    });
+
+    const options = [
+      {
+        label: "белый",
+        value: "белый",
+      },
+      {
+        label: "бежевый",
+        value: "бежевый",
+      },
+      {
+        label: "разноцветный",
+        value: "разноцветный",
+      },
+      {
+        label: "розовый",
+        value: "розовый",
+      },
+      {
+        label: "серый",
+        value: "серый",
+      },
+      {
+        label: "радуга",
+        value: "радуга",
+      },
+
+      //       useQuery(gql`
+      //     query MyQuery {
+      // toys(distinct_on: color) {
+      //   color
+      // }
+      //   `),
+    ];
+
+    /**
+     * добавление в корзинку и скрытие корзинки
+     */
+
+    let isVisible = ref(true);
+
+    const clickBasket = (toy) => {
+      // isVisible.value = false; СКРЫВАЕТ ВСЕ КОРЗИНКИ ВМЕСТО ОДНОЙ
+
+      const clonToy = { ...toy };
+      storeHomeToys.getBasket(clonToy);
+    };
+
+    // const indexToyObject = this.toy.findIndex((el) => el === toy);
+    // console.log(indexToyObject);
+
+    /**
+     * схлопывание бургер
+     */
+    const leftDrawerOpen = ref(true);
+
+    const toggleLeftDrawer = () => {
+      leftDrawerOpen.value = !leftDrawerOpen.value;
+    };
+
     return {
-      toys,
+      storeHomeToys,
+      clonToys,
+      clickBasket,
+      slide,
+      autoplay,
+      group,
+      filterColor,
       clickInfo,
       fixed,
       dialogDesk,
+      options,
+      filterByColor,
+      filterArrayColor,
+      leftDrawerOpen,
+      toggleLeftDrawer,
+      isVisible,
+      searchToy,
+      search,
+      sortOptions,
+      sortToys,
+      sortedCard,
+      sortByAsk,
+      sortByDesk,
 
-      group: ref([]),
-      options: [
-        {
-          label: "белый",
-          value: "op1",
-        },
-        {
-          label: "бежевый",
-          value: "op2",
-        },
-        {
-          label: "разноцветный",
-          value: "op3",
-        },
-        {
-          label: "розовый",
-          value: "op4",
-        },
-        {
-          label: "серый",
-          value: "op5",
-        },
-        {
-          label: "радуга",
-          value: "op6",
-        },
-        //       useQuery(gql`
-        //     query MyQuery {
-        // toys(distinct_on: color) {
-        //   color
-        // }
-        //   `),
-      ],
-
-      model: ref(null),
+      // model: ref(null),
       thumbStyle: {
         right: "4px",
         borderRadius: "5px",
@@ -259,6 +375,7 @@ export default {
         width: "5px",
         opacity: 0.75,
       },
+
       barStyle: {
         right: "2px",
         borderRadius: "9px",
@@ -266,8 +383,7 @@ export default {
         width: "9px",
         opacity: 0.2,
       },
-      slide: ref(1),
-      autoplay: ref(true),
+
       arrowStyle: {
         color: "black",
       },
@@ -286,14 +402,17 @@ export default {
   font-family: "Comic-Sans-MS";
 }
 
+.border-btn {
+  border: 2px solid #f468ae;
+}
+
 .my-card {
-  width: 100%;
-  max-width: 200px;
+  max-width: 220px;
   border-radius: 10px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  max-height: 460px;
+  max-height: 520px;
 }
 
 .input_main {
@@ -325,5 +444,13 @@ export default {
 
 .q-dialog__inner--minimized > div {
   max-width: 705px;
+}
+
+.menu-btn {
+  position: relative;
+  top: -65px;
+  font-size: 16px;
+  color: white;
+  z-index: 2000;
 }
 </style>

@@ -1,5 +1,6 @@
 <template>
   <q-page>
+    <!-- Карта -->
     <div class="absolute-center">
       <div class="text-h3 text-center q-ma-xl">Наши магазины</div>
       <div style="overflow: hidden">
@@ -16,6 +17,3 @@
   </q-page>
 </template>
 
-<script>
-export default {};
-</script>

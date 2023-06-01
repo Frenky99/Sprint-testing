@@ -1,5 +1,7 @@
 <template>
   <q-page>
+
+    <!-- Контакты -->
     <div class="text-h3 q-ma-md">Контакты</div>
     <div class="q-mx-md">
       <div style="max-width: 750px">
@@ -55,6 +57,3 @@
   </q-page>
 </template>
 
-<script>
-export default {};
-</script>
